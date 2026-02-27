@@ -1,0 +1,15 @@
+{
+  "name": "影風物流管理工具",
+  "short_name": "物流工具",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#007bff",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2311/2311523.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
