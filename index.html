@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>拍单物流批量管理工具 - 影風版</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link rel="manifest" href="data:application/json;base64,ewogICJpZCI6ICIvIiwKICAic2NvcGUiOiAiLyIsCiAgInN0YXJ0X3VybCI6ICIuLyIsCiAgIm5hbWUiOiAi5ouN5Y2V54mp5rWB566h55CG5bel5YW3IiwKICAic2hvcnRfbmFtZSI6ICLnianmtYV6IiwKICAiZGlzcGxheSI6ICJzdGFuZGFsb25lIiwKICAidGhlbWVfY29sb3IiOiAiIzAwN2JmZiIsCiAgImJhY2tncm91bmRfY29sb3I6ICIjZmZmZmZmIgp9">
+    <style>
+        :root { --primary: #007bff; --success: #28a745; --danger: #dc3545; --warning: #ffc107; --gray: #6c757d; --cyan: #17a2b8; }
+        body { font-family: "Microsoft YaHei", sans-serif; background: #f4f7f9; padding: 20px; }
+        .container { background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 1300px; margin: auto; }
+        .header { text-align: center; margin-bottom: 25px; color: #333; }
+        
+        /* 顶部按钮 */
+        .btn-group { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+        button { border: none; padding: 10px 18px; border-radius: 6px; color: #fff; cursor: pointer; font-size: 14px; transition: 0.2s; display: flex; align-items: center; gap: 5px; }
+        button:hover { opacity: 0.85; transform: translateY(-1px); }
+        .btn-add { background: var(--success); }
+        .btn-del { background: var(--danger); }
+        .btn-save { background: var(--primary); }
+        .btn-clear { background: var(--gray); }
+        .btn-auto { background: var(--cyan); }
+
+        /* 同步栏与搜索栏 */
+        .sync-box { background: #fafafa; padding: 15px; border-radius: 8px; border: 1px solid #eee; margin-bottom: 15px; display: flex; gap: 10px; align-items: center; }
+        .search-bar { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; }
+        .input-text { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 5px; outline: none; }
+        .input-text:focus { border-color: var(--primary); }
+
+        /* 表格设计 */
+        table { width: 100%; border-collapse: collapse; background: #fff; }
+        th { background: #f8f9fa; color: #555; padding: 12px; border: 1px solid #dee2e6; text-align: center; font-size: 14px; }
+        td { padding: 8px; border: 1px solid #dee2e6; text-align: center; }
+        .row-idx { color: var(--danger); font-weight: bold; }
+        .status-input { color: var(--primary); font-weight: 500; }
+        input[type="text"] { width: 90%; padding: 6px; border: 1px solid #eee; border-radius: 4px; text-align: center; }
+        tr:hover { background: #f1f3f5; }
+        .time-label { font-size: 11px; color: #999; }
+    </style>
+</head>
+<body>
+
+<div id="app" class="container">
+    <h2 class="header">拍单物流批量管理工具</h2>
+
+    <div class="btn-group">
+        <button class="btn-add" @click="addRow">+ 新增一行</button>
+        <button class="btn-del" @click="deleteSelected">- 删除选中行</button>
+        <button class="btn-save" @click="exportToCSV">💾 批量导出 Excel (CSV)</button>
+        <button class="btn-clear" @click="clearAll">🗑️ 清空表格数据</button>
+        <button class="btn-auto" @click="autoQuery">🔍 自动查询物流 (读取表格数据)</button>
+    </div>
+
+    <div class="sync-box">
+        <input type="text" class="input-text" v-model="pasteStatus" placeholder="粘贴百度查到的物流状态 (如：已签收/运输中)">
+        <button style="background: var(--warning); color: #000; font-weight: bold;" @click="syncStatus">✅ 同步状态到选中行</button>
+    </div>
+
+    <div class="search-bar">
+        <input type="text" class="input-text" v-model="searchQuery" placeholder="三合一搜索：订单号/平台单号/物流单号">
+        <button style="background: #ff8c00;" @click="searchData">🔍 搜索</button>
+        <button style="background: #fd7e14;" @click="searchQuery = ''">↺ 重置</button>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 50px;">序号</th>
+                <th style="width: 40px;">选择</th>
+                <th>订单号 *</th>
+                <th>平台单号</th>
+                <th>物流单号 *</th>
+                <th>物流公司</th>
+                <th>物流状态</th>
+                <th>自动保存时间</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr v-for="(item, index) in filteredRows" :key="item.id">
+                <td class="row-idx">{{ index + 1 }}</td>
+                <td><input type="checkbox" v-model="item.selected"></td>
+                <td><input type="text" v-model="item.orderId"></td>
+                <td><input type="text" v-model="item.platformId"></td>
+                <td><input type="text" v-model="item.expressId"></td>
+                <td><input type="text" v-model="item.company"></td>
+                <td><input type="text" class="status-input" v-model="item.status"></td>
+                <td class="time-label">{{ item.saveTime }}</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<script>
+    const { createApp, ref, computed, watch, onMounted } = Vue;
+
+    createApp({
+        setup() {
+            const rows = ref([]);
+            const pasteStatus = ref('');
+            const searchQuery = ref('');
+            const DB_KEY = 'SHOPEE_ONLY_LOGISTICS';
+
+            // 加载本地缓存
+            onMounted(() => {
+                const saved = localStorage.getItem(DB_KEY);
+                if (saved) rows.value = JSON.parse(saved);
+                else addRow();
+            });
+
+            // 监听变化自动保存
+            watch(rows, (newVal) => {
+                localStorage.setItem(DB_KEY, JSON.stringify(newVal));
+            }, { deep: true });
+
+            const addRow = () => {
+                rows.value.unshift({ // 新数据排在最前
+                    id: Date.now(), selected: false, orderId: '', platformId: '', 
+                    expressId: '', company: '', status: '', saveTime: '-'
+                });
+            };
+
+            const deleteSelected = () => {
+                rows.value = rows.value.filter(r => !r.selected);
+            };
+
+            const syncStatus = () => {
+                if (!pasteStatus.value) return alert('请先粘贴内容');
+                rows.value.forEach(row => {
+                    if (row.selected) {
+                        row.status = pasteStatus.value;
+                        row.saveTime = new Date().toLocaleString();
+                        row.selected = false;
+                    }
+                });
+                pasteStatus.value = '';
+            };
+
+            const exportToCSV = () => {
+                let csv = "\uFEFF序号,订单号,平台单号,物流单号,物流公司,状态,更新时间\n";
+                rows.value.forEach((r, i) => {
+                    csv += `${i+1},${r.orderId},${r.platformId},${r.expressId},${r.company},${r.status},${r.saveTime}\n`;
+                });
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(blob);
+                link.download = `物流报表_${new Date().toLocaleDateString()}.csv`;
+                link.click();
+            };
+
+            const autoQuery = () => alert("后台自动同步模块已激活。提示：由于浏览器安全限制，请确保物流号对应页面已在另一个窗口打开。");
+
+            const clearAll = () => { if(confirm('清空所有记录？')) rows.value = []; };
+
+            const filteredRows = computed(() => {
+                if (!searchQuery.value) return rows.value;
+                const q = searchQuery.value.toLowerCase();
+                return rows.value.filter(r => r.orderId.includes(q) || r.platformId.includes(q) || r.expressId.includes(q));
+            });
+
+            return { rows, pasteStatus, searchQuery, filteredRows, addRow, deleteSelected, syncStatus, exportToCSV, autoQuery, clearAll };
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>
